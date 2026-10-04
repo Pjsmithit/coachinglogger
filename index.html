@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en-GB"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Coaching Log</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#f5f7f7;--card:#fff;--tx:#14201f;--mu:#5d6d6b;--ac:#0f766e;--bd:#d5dedd}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1514;--card:#17211f;--tx:#e6efee;--mu:#93a4a1;--ac:#2dd4bf;--bd:#2a3836}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px system-ui,sans-serif;padding:env(safe-area-inset-top) 0 calc(70px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;z-index:5;display:flex;gap:8px;padding:8px 10px;background:var(--bg);border-bottom:1px solid var(--bd)}
+header input{flex:1;text-align:center}
+button,input,select,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;min-height:44px}
+textarea{width:100%}
+main{padding:10px;max-width:640px;margin:auto}
+details{background:var(--card);border:1px solid var(--bd);border-radius:12px;margin-bottom:10px}
+summary{padding:12px;font-weight:600;color:var(--ac)}
+.g{padding:0 12px 8px;display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.f{display:flex;flex-direction:column;gap:3px}.f.w{grid-column:1/-1}
+label{font-size:13px;color:var(--mu)}label i{font-style:normal;opacity:.8}
+.sc{display:flex;gap:4px}.sc button{flex:1;padding:0;min-height:40px}
+.on{background:var(--ac)!important;color:#fff!important;border-color:var(--ac)!important}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;gap:6px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--bd)}
+nav button{flex:1}
+.p{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+.p h3{margin:0 0 8px;font-size:15px}.p button{width:100%;margin-top:6px}.p small{color:var(--mu)}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px 3px;text-align:right;border-bottom:1px solid var(--bd)}th:first-child,td:first-child{text-align:left}
+.warn{background:#b45309;color:#fff;padding:10px;border-radius:10px;margin-bottom:10px}
+#t{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000;color:#fff;padding:8px 14px;border-radius:20px;opacity:0;transition:.3s;pointer-events:none}
+</style></head><body>
+<header><button id=pv>‹</button><input type=date id=dt><button id=nx>›</button></header>
+<main id=app></main>
+<nav><button data-v=day>Day</button><button data-v=week>Week</button><button data-v=data>Backup</button></nav>
+<div id=t></div>
+<script>
+const K='coachlog.v1',$=s=>document.querySelector(s),app=$('#app');
+const iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const pd=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const add=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
+const sun=s=>add(s,-pd(s).getDay());
+const DN=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
+S=S||{set:{sw:119.8,p:200,f:65,c:180,steps:10000,cardio:'3X10 MINS'},days:{},wk:{},sent:{},bk:null};
+S.sent=S.sent||{};
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){alert('Could not save: '+e)}};
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+let cur=iso(new Date()),view='day';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const MD=['LOW','MODERATE','HIGH','TRAINING','REST','DIET BREAK','PLAN'];
+// [key,label,type,sheet column]  type: n=number, t=text, s=1-7 scale, array=dropdown
+const SEC=[
+['Weight',[['weight','Bodyweight (kg)','n','E']]],
+['Nutrition',[['macro','Macro day',MD,'G'],['protein','Protein (g)','n','H'],['fats','Fats (g)','n','I'],['carbs','Carbs (g)','n','J'],['kcal','Calories (auto)','n','K'],['fibre','Fibre intake','n','M'],['fluid','Fluid (litres)','n','N'],['hunger','Hunger levels','s','O'],['craving','Craving levels','s','P'],['offplan','Off plan meal – what was it?','t','Q']]],
+['Training & cardio',[['sessions','Sessions',['WEIGHTS','CARDIO','WEIGHTS & CARDIO','STEPS ONLY','REST'],'T'],['steps','Steps','n','U'],['cardio','Cardio (cals burnt only or mins active)','n','V'],['motiv','Motivation to train','s','W'],['perf','Performance','s','X'],['enjoy','Enjoyment','s','Y']]],
+['Recovery & stress',[['sore','Muscle soreness','s','AA'],['energy','Energy levels','s','AB'],['stress','Stress levels','s','AC']]],
+['Digestion',[['stoolf','Frequency of stool movements',['1','2','3','4','5+'],'AE'],['stoolq','Quality of stool',['LOOSE','REGULAR','SOLID'],'AF'],['gi','GI distress (gas/bloating)','s','AG']]],
+['Sleep',[['slh','Sleep hours','n','AI'],['slm','Sleep mins','n','AJ'],['slq','Quality of sleep','s','AK']]],
+['Health markers',[['sys','Blood pressure SYS','n','AM'],['dia','Blood pressure DIA','n','AN'],['rhr','RHR','n','AO'],['glu','Blood glucose','n','AP']]],
+['Additional notes',[['notes','Details, slip ups & reasoning','t','AX']]]];
+const FL=SEC.flatMap(s=>s[1]);
+const HINT={protein:()=>S.set.p,fats:()=>S.set.f,carbs:()=>S.set.c,steps:()=>S.set.steps,cardio:()=>S.set.cardio};
+const day=()=>S.days[cur]=S.days[cur]||{};
+function fld([k,l,t],d){const v=d[k]??'',h=HINT[k]?` <i>(target ${HINT[k]()})</i>`:'';let x=`<label>${l}${h}</label>`;
+if(t=='s')x+='<div class=sc>'+[1,2,3,4,5,6,7].map(n=>`<button type=button data-k=${k} data-s=${n} class="${v==n?'on':''}">${n}</button>`).join('')+'</div>';
+else if(Array.isArray(t))x+=`<select data-k=${k}><option value="">–</option>${t.map(o=>`<option${v==o?' selected':''}>${o}</option>`).join('')}</select>`;
+else if(t=='t')x+=`<textarea data-k=${k} rows=3>${esc(v)}</textarea>`;
+else x+=`<input data-k=${k} inputmode=decimal value="${esc(v)}">`;
+return `<div class="f${t=='t'||k=='macro'?' w':''}">${x}</div>`}
+const num=v=>v===undefined||v===''||isNaN(+v)?null:+v;
+const dayMsg=()=>{const b=S.bk?(Date.now()-new Date(S.bk))/864e5:null;return Object.keys(S.days).length&&(b===null||b>7)?`<div class=warn>${b===null?'No backup yet.':'Last backup was '+Math.floor(b)+' days ago.'} Go to Backup and export your data.</div>`:''};
+function weekRows(w){return Array.from({length:7},(_,i)=>{const dt=add(w,i);return[dt,S.days[dt]||{}]})}
+function tsv(w,cols,mode){return weekRows(w).map(([,d])=>{const o=[];for(const c of cols)o.push(String(d[c]??'').replace(/[\t\r\n]+/g,' '));return o.join('\t')}).join('\n')}
+const L2N=l=>[...l].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
+const colmap=Object.fromEntries(FL.filter(f=>f[3]!='AX').map(f=>[L2N(f[3]),f[0]]));
+const mainCols=[];for(let i=L2N('E');i<=L2N('AS');i++)mainCols.push(colmap[i]||'_');
+const mainTSV=w=>weekRows(w).map(([,d])=>mainCols.map(c=>c=='_'?'':String(d[c]??'')).join('\t')).join('\n');
+function render(){
+$('#dt').value=cur;$('#dt').style.display=view=='day'?'':'none';$('#pv').style.display=$('#nx').style.display=view=='data'?'none':'';
+document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
+if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')}
+else if(view=='week')weekV();else dataV()}
+function weekV(){const w=sun(cur),r=weekRows(w),avg=k=>{const a=r.map(([,d])=>num(d[k])).filter(x=>x!==null);return a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(k=='weight'?1:0):'–'};
+const m=S.wk[w]||{},wa=avg('weight'),logged=r.filter(([,d])=>Object.keys(d).length).length;
+app.innerHTML=`<div class=p><h3>Week ${w} → ${add(w,6)} <small>(${logged}/7 logged)</small></h3><table><tr><th></th><th>Kg</th><th>Kcal</th><th>Prot</th><th>Steps</th></tr>${r.map(([dt,d])=>`<tr><td>${DN[pd(dt).getDay()]} ${dt.slice(8)}</td><td>${d.weight||''}</td><td>${d.kcal||''}</td><td>${d.protein||''}</td><td>${d.steps||''}</td></tr>`).join('')}<tr><th>AVG</th><th>${wa}</th><th>${avg('kcal')}</th><th>${avg('protein')}</th><th>${avg('steps')}</th></tr></table>${wa!='–'?`<small>Weight change vs start (${S.set.sw}kg): ${(wa-S.set.sw).toFixed(1)}kg</small>`:''}</div>
+<div class=p><h3>Weekly measurements (cm)</h3><div class=g style="padding:0">${['waist','hips','chest'].map(k=>`<div class=f><label>${k}</label><input data-m=${k} inputmode=decimal value="${esc(m[k]??'')}"></div>`).join('')}</div></div>
+<div class=p><h3>Copy to Google Sheet ${S.sent[w]?'✅ transferred':''}</h3><small>Select the first cell then paste. Dates/day columns are left alone so your sheet formulas survive.</small>
+<button data-c=main>1. Copy daily block → paste at E${'{row}'} (SUN, bodyweight)</button>
+<button data-c=notes>2. Copy additional notes → paste at AX (SUN row)</button>
+<button data-c=meas>3. Copy measurements → paste at AV (waist row)</button>
+<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type=checkbox id=sent ${S.sent[w]?'checked':''} style="min-height:0"> Mark this week as transferred</label></div>`.replace('{row}','…')}
+function dataV(){const n=Object.keys(S.days).length,s=S.set;
+app.innerHTML=`${dayMsg()}<div class=p><h3>Backup & restore</h3><small>${n} days saved on this device. Last backup: ${S.bk?new Date(S.bk).toLocaleString('en-GB'):'never'}</small>
+<button data-a=exp>⬇ Export backup (JSON)</button><button data-a=share>Share backup…</button><button data-a=csv>Export all days (CSV)</button>
+<button data-a=imp>⬆ Restore from backup file</button><input type=file id=fi accept=".json" hidden></div>
+<div class=p><h3>Targets & start</h3><div class=g style="padding:0">${[['sw','Start weight kg'],['p','Protein g'],['f','Fats g'],['c','Carbs g'],['steps','Steps'],['cardio','Cardio']].map(([k,l])=>`<div class=f><label>${l}</label><input data-s=${k} value="${esc(s[k])}"></div>`).join('')}</div></div>
+<div class=p><small>Data lives in this browser only. Clearing site data or switching browser removes it, so export regularly.</small></div>`}
+const toast=m=>{const t=$('#t');t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,1800)};
+async function copy(x){try{await navigator.clipboard.writeText(x)}catch(e){const a=document.createElement('textarea');a.value=x;document.body.append(a);a.select();document.execCommand('copy');a.remove()}toast('Copied')}
+function dl(name,txt,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type}));a.download=name;a.click()}
+const bkJSON=()=>JSON.stringify({...S,bk:null,exported:new Date().toISOString()},null,1);
+const stamp=()=>{S.bk=new Date().toISOString();save()};
+app.addEventListener('input',e=>{const t=e.target,k=t.dataset.k;
+if(t.dataset.m){(S.wk[sun(cur)]=S.wk[sun(cur)]||{})[t.dataset.m]=t.value;return save()}
+if(t.dataset.s&&view=='data'){S.set[t.dataset.s]=isNaN(+t.value)||t.value===''?t.value:+t.value;return save()}
+if(t.id=='sent'){S.sent[sun(cur)]=t.checked;save();return render()}
+if(!k)return;const d=day();if(t.value==='')delete d[k];else d[k]=t.value;
+if(['protein','fats','carbs'].includes(k)&&!d._km){const p=+d.protein||0,f=+d.fats||0,c=+d.carbs||0;if(p||f||c){d.kcal=String(p*4+f*9+c*4);const el=app.querySelector('[data-k=kcal]');if(el)el.value=d.kcal}}
+if(k=='kcal')d._km=1;save()});
+app.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const w=sun(cur);
+if(t.dataset.s&&t.dataset.k){const d=day(),k=t.dataset.k;if(d[k]==t.dataset.s)delete d[k];else d[k]=t.dataset.s;save();return render()}
+if(t.dataset.c=='main')copy(mainTSV(w));
+if(t.dataset.c=='notes')copy(tsv(w,['notes']));
+if(t.dataset.c=='meas'){const m=S.wk[w]||{};copy([m.waist??'','',m.hips??'','',m.chest??''].join('\n'))}
+if(t.dataset.a=='exp'){dl(`coaching-backup-${iso(new Date())}.json`,bkJSON(),'application/json');stamp();toast('Backup saved')}
+if(t.dataset.a=='share'){const f=new File([bkJSON()],`coaching-backup-${iso(new Date())}.json`,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f]}).then(()=>{stamp();render()}).catch(()=>{});else toast('Share not supported – use Export')}
+if(t.dataset.a=='csv'){const hd=['date',...FL.map(f=>f[1])],rows=Object.keys(S.days).sort().map(dt=>[dt,...FL.map(f=>S.days[dt][f[0]]??'')]);dl('coaching-all-days.csv',[hd,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv')}
+if(t.dataset.a=='imp')$('#fi').click()});
+app.addEventListener('change',e=>{if(e.target.id!='fi')return;const f=e.target.files[0];if(!f)return;f.text().then(x=>{try{const o=JSON.parse(x);if(!o.days)throw 0;if(!confirm('Merge '+Object.keys(o.days).length+' days from this file? Imported days overwrite matching dates.'))return;Object.assign(S.days,o.days);Object.assign(S.wk,o.wk||{});Object.assign(S.sent,o.sent||{});if(o.set)S.set={...S.set,...o.set};save();render();toast('Restored')}catch(_){alert('Not a valid backup file')}})});
+document.querySelector('nav').addEventListener('click',e=>{if(e.target.dataset.v){view=e.target.dataset.v;render()}});
+$('#pv').onclick=()=>{cur=add(cur,view=='week'?-7:-1);render()};$('#nx').onclick=()=>{cur=add(cur,view=='week'?7:1);render()};
+$('#dt').onchange=e=>{if(e.target.value){cur=e.target.value;render()}};
+render();
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
