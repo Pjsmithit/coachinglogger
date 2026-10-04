@@ -84,7 +84,7 @@ return cells.map(x=>x.replace(/[\t\r\n]+/g,' ')).join('\t')}
 function render(){
 $('#dt').value=cur;$('#dt').style.display=view=='day'?'':'none';$('#pv').style.display=$('#nx').style.display=view=='data'?'none':'';
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
-if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Copy this day to Google Sheet</h3><small>Paste at <b>E${dayRow()+pd(cur).getDay()}</b> (${DN[pd(cur).getDay()]} row). Includes additional notes.</small><button data-c=day>Copy ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</button></div>`}
+if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><button data-c=health>↻ Import steps & sleep from Apple Health</button></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Copy this day to Google Sheet</h3><small>Paste at <b>E${dayRow()+pd(cur).getDay()}</b> (${DN[pd(cur).getDay()]} row). Includes additional notes.</small><button data-c=day>Copy ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</button></div>`}
 else if(view=='week')weekV();else dataV()}
 function weekV(){const w=sun(cur),r=weekRows(w),avg=k=>{const a=r.map(([,d])=>num(d[k])).filter(x=>x!==null);return a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(k=='weight'?1:0):'–'};
 const m=S.wk[w]||{},wa=avg('weight'),logged=r.filter(([,d])=>Object.keys(d).length).length;
@@ -115,6 +115,7 @@ if(['protein','fats','carbs'].includes(k)&&!d._km){const p=+d.protein||0,f=+d.fa
 if(k=='kcal')d._km=1;save()});
 app.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const w=sun(cur);
 if(t.dataset.s&&t.dataset.k){const d=day(),k=t.dataset.k;if(d[k]==t.dataset.s)delete d[k];else d[k]=t.dataset.s;save();return render()}
+if(t.dataset.c=='health')location.href='shortcuts://run-shortcut?name=Coaching%20Health';
 if(t.dataset.c=='day')copy(dayTSV(cur));
 if(t.dataset.c=='main')copy(mainTSV(w));
 if(t.dataset.c=='notes')copy(tsv(w,['notes']));
@@ -127,6 +128,11 @@ app.addEventListener('change',e=>{if(e.target.id!='fi')return;const f=e.target.f
 document.querySelector('nav').addEventListener('click',e=>{if(e.target.dataset.v){view=e.target.dataset.v;render()}});
 $('#pv').onclick=()=>{cur=add(cur,view=='week'?-7:-1);render()};$('#nx').onclick=()=>{cur=add(cur,view=='week'?7:1);render()};
 $('#dt').onchange=e=>{if(e.target.value){cur=e.target.value;render()}};
+(function(){const q=new URLSearchParams(location.search);if(!q.get('steps')&&!q.get('sleep'))return;
+const dt=/^\d{4}-\d\d-\d\d$/.test(q.get('date')||'')?q.get('date'):iso(new Date()),d=S.days[dt]=S.days[dt]||{};
+const st=Math.round(+q.get('steps'));if(q.get('steps')&&st>=0)d.steps=String(st);
+const sl=Math.round(+q.get('sleep'));if(q.get('sleep')&&sl>0){d.slh=String(Math.floor(sl/60));d.slm=String(sl%60)}
+save();cur=dt;history.replaceState(null,'',location.pathname);setTimeout(()=>toast('Imported from Health'),400)})();
 render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
