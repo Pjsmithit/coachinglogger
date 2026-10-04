@@ -128,10 +128,10 @@ app.addEventListener('change',e=>{if(e.target.id!='fi')return;const f=e.target.f
 document.querySelector('nav').addEventListener('click',e=>{if(e.target.dataset.v){view=e.target.dataset.v;render()}});
 $('#pv').onclick=()=>{cur=add(cur,view=='week'?-7:-1);render()};$('#nx').onclick=()=>{cur=add(cur,view=='week'?7:1);render()};
 $('#dt').onchange=e=>{if(e.target.value){cur=e.target.value;render()}};
-(function(){const q=new URLSearchParams(location.search);if(!q.get('steps')&&!q.get('sleep'))return;
+(function(){const q=new URLSearchParams(location.search);if(!q.get('steps')&&!q.get('sleep')&&!q.get('sleephrs'))return;
 const dt=/^\d{4}-\d\d-\d\d$/.test(q.get('date')||'')?q.get('date'):iso(new Date()),d=S.days[dt]=S.days[dt]||{};
 const st=Math.round(+q.get('steps'));if(q.get('steps')&&st>=0)d.steps=String(st);
-const sl=Math.round(+q.get('sleep'));if(q.get('sleep')&&sl>0){d.slh=String(Math.floor(sl/60));d.slm=String(sl%60)}
+const sl=Math.round(q.get('sleephrs')?+q.get('sleephrs')*60:+q.get('sleep'));if((q.get('sleep')||q.get('sleephrs'))&&sl>0){d.slh=String(Math.floor(sl/60));d.slm=String(sl%60)}
 save();cur=dt;history.replaceState(null,'',location.pathname);setTimeout(()=>toast('Imported from Health'),400)})();
 render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
