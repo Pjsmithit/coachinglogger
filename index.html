@@ -130,12 +130,14 @@ document.querySelector('nav').addEventListener('click',e=>{if(e.target.dataset.v
 $('#pv').onclick=()=>{cur=add(cur,view=='week'?-7:-1);render()};$('#nx').onclick=()=>{cur=add(cur,view=='week'?7:1);render()};
 $('#dt').onchange=e=>{if(e.target.value){cur=e.target.value;render()}};
 (function(){const q=new URLSearchParams(location.search),M={steps:'steps',kcal:'kcal',protein:'protein',carbs:'carbs',fat:'fats',fibre:'fibre'};
-if(![...Object.keys(M),'sleep','sleephrs'].some(k=>q.get(k)))return;
-const dt=/^\d{4}-\d\d-\d\d$/.test(q.get('date')||'')?q.get('date'):iso(new Date()),d=S.days[dt]=S.days[dt]||{};
-for(const[p,f]of Object.entries(M)){const v=+q.get(p);if(q.get(p)&&v>=0){d[f]=String(p=='steps'||p=='kcal'?Math.round(v):Math.round(v*10)/10);if(p=='kcal')d._km=1}}
-if(!q.get('kcal')&&!d._km&&(q.get('protein')||q.get('fat')||q.get('carbs')))d.kcal=String(Math.round(4*(+d.protein||0)+9*(+d.fats||0)+4*(+d.carbs||0)));
-const sl=Math.round(q.get('sleephrs')?+q.get('sleephrs')*60:+q.get('sleep'));if((q.get('sleep')||q.get('sleephrs'))&&sl>0){d.slh=String(Math.floor(sl/60));d.slm=String(sl%60)}
-save();cur=dt;history.replaceState(null,'',location.pathname);setTimeout(()=>toast('Imported from Health'),400)})();
+if(![...Object.keys(M),'sleep','sleephrs'].some(k=>q.has(k)))return;
+const N=k=>{const v=parseFloat(String(q.get(k)||'').replace(/,/g,''));return isNaN(v)||v<0?null:v};
+const dt=/^\d{4}-\d\d-\d\d$/.test(q.get('date')||'')?q.get('date'):iso(new Date()),d=S.days[dt]=S.days[dt]||{},got=[];
+for(const[p,f]of Object.entries(M)){const v=N(p);if(v!==null){d[f]=String(p=='steps'||p=='kcal'?Math.round(v):Math.round(v*10)/10);if(p=='kcal')d._km=1;got.push(f)}}
+if(!q.get('kcal')&&!d._km&&(N('protein')!==null||N('fat')!==null||N('carbs')!==null)){d.kcal=String(Math.round(4*(+d.protein||0)+9*(+d.fats||0)+4*(+d.carbs||0)));got.push('kcal')}
+const sl=Math.round(N('sleephrs')!==null?N('sleephrs')*60:N('sleep')||0);if(sl>0){d.slh=String(Math.floor(sl/60));d.slm=String(sl%60);got.push('sleep')}
+save();cur=dt;const raw=decodeURIComponent(location.search);history.replaceState(null,'',location.pathname);
+if(got.length)setTimeout(()=>toast('Imported: '+got.join(', ')),400);else setTimeout(()=>alert('Link received but no numbers could be read:\n'+raw),400)})();
 render();
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
