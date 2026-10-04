@@ -74,24 +74,29 @@ function tsv(w,cols,mode){return weekRows(w).map(([,d])=>{const o=[];for(const c
 const L2N=l=>[...l].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
 const colmap=Object.fromEntries(FL.filter(f=>f[3]!='AX').map(f=>[L2N(f[3]),f[0]]));
 const mainCols=[];for(let i=L2N('E');i<=L2N('AS');i++)mainCols.push(colmap[i]||'_');
-const mainTSV=w=>weekRows(w).map(([,d])=>mainCols.map(c=>c=='_'?'':String(d[c]??'')).join('\t')).join('\n');
+const mainTSV=(w,p)=>weekRows(w).map(([,d])=>part(mainCols.map(c=>c=='_'?'':String(d[c]??'')),p).join('\t')).join('\n');
 const dayRow=()=>+S.set.row||13;
-function dayTSV(dt){const d=S.days[dt]||{},i=pd(dt).getDay(),m=S.wk[sun(dt)]||{},r=dayRow();
+function dayCells(dt){const d=S.days[dt]||{},i=pd(dt).getDay(),m=S.wk[sun(dt)]||{},r=dayRow();
 const au=[['WAIST',m.waist],['',''],['HIPS',m.hips],['',''],['CHEST',m.chest],['',''],['TOTAL',`=SUM(AV${r},AV${r+2},AV${r+4})`]][i];
 const cells=mainCols.map(c=>c=='_'?'':String(d[c]??''));
 cells.push('',au[0],au[1]??'','',String(d.notes??''));
-return cells.map(x=>x.replace(/[\t\r\n]+/g,' ')).join('\t')}
+return cells.map(x=>x.replace(/[\t\r\n]+/g,' '))}
+const part=(c,p)=>p=='a'?c.slice(0,6):p=='k'?c.slice(6,7):p=='b'?c.slice(8):c;
+const dayTSV=(dt,p)=>part(dayCells(dt),p).join('\t');
 function render(){
 $('#dt').value=cur;$('#dt').style.display=view=='day'?'':'none';$('#pv').style.display=$('#nx').style.display=view=='data'?'none':'';
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
-if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><button data-c=food>↻ Import metrics</button></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Copy this day to Google Sheet</h3><small>Paste at <b>E${dayRow()+pd(cur).getDay()}</b> (${DN[pd(cur).getDay()]} row). Includes additional notes.</small><button data-c=day>Copy ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</button></div>`}
+if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><button data-c=food>↻ Import metrics</button></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Copy this day to Google Sheet</h3>${(r=>`<small>Your sheet has merged calorie cells (K:L), so paste in 3 parts for <b>${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</b>. Notes are in part 3.</small><button data-c=day data-p=a>1 · Weight → Carbs · paste at E${r}</button><button data-c=day data-p=k>2 · Calories · paste at K${r}</button><button data-c=day data-p=b>3 · Fibre → Notes · paste at M${r}</button><button data-c=day>Copy all in one (may break merged cells)</button>`)(dayRow()+pd(cur).getDay())}</div>`}
 else if(view=='week')weekV();else dataV()}
 function weekV(){const w=sun(cur),r=weekRows(w),avg=k=>{const a=r.map(([,d])=>num(d[k])).filter(x=>x!==null);return a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(k=='weight'?1:0):'–'};
 const m=S.wk[w]||{},wa=avg('weight'),logged=r.filter(([,d])=>Object.keys(d).length).length;
 app.innerHTML=`<div class=p><h3>Week ${w} → ${add(w,6)} <small>(${logged}/7 logged)</small></h3><table><tr><th></th><th>Kg</th><th>Kcal</th><th>Prot</th><th>Steps</th></tr>${r.map(([dt,d])=>`<tr><td>${DN[pd(dt).getDay()]} ${dt.slice(8)}</td><td>${d.weight||''}</td><td>${d.kcal||''}</td><td>${d.protein||''}</td><td>${d.steps||''}</td></tr>`).join('')}<tr><th>AVG</th><th>${wa}</th><th>${avg('kcal')}</th><th>${avg('protein')}</th><th>${avg('steps')}</th></tr></table>${wa!='–'?`<small>Weight change vs start (${S.set.sw}kg): ${(wa-S.set.sw).toFixed(1)}kg</small>`:''}</div>
 <div class=p><h3>Weekly measurements (cm)</h3><div class=g style="padding:0">${['waist','hips','chest'].map(k=>`<div class=f><label>${k}</label><input data-m=${k} inputmode=decimal value="${esc(m[k]??'')}"></div>`).join('')}</div></div>
 <div class=p><h3>Copy to Google Sheet ${S.sent[w]?'✅ transferred':''}</h3><small>Select the first cell then paste. Dates/day columns are left alone so your sheet formulas survive.</small>
-<button data-c=main>1. Copy daily block → paste at E${'{row}'} (SUN, bodyweight)</button>
+<small>Merged calorie cells need 3 pastes for the daily block (SUN row = ${dayRow()}):</small>
+<button data-c=main data-p=a>1a · Weight → Carbs · paste at E${dayRow()}</button>
+<button data-c=main data-p=k>1b · Calories · paste at K${dayRow()}</button>
+<button data-c=main data-p=b>1c · Fibre → Cycle cols · paste at M${dayRow()}</button>
 <button data-c=notes>2. Copy additional notes → paste at AX (SUN row)</button>
 <button data-c=meas>3. Copy measurements → paste at AV (waist row)</button>
 <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type=checkbox id=sent ${S.sent[w]?'checked':''} style="min-height:0"> Mark this week as transferred</label></div>`.replace('{row}','…')}
@@ -116,8 +121,8 @@ if(k=='kcal')d._km=1;save()});
 app.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const w=sun(cur);
 if(t.dataset.s&&t.dataset.k){const d=day(),k=t.dataset.k;if(d[k]==t.dataset.s)delete d[k];else d[k]=t.dataset.s;save();return render()}
 if(t.dataset.c=='food')location.href='shortcuts://run-shortcut?name=Coaching%20Nutrition';
-if(t.dataset.c=='day')copy(dayTSV(cur));
-if(t.dataset.c=='main')copy(mainTSV(w));
+if(t.dataset.c=='day')copy(dayTSV(cur,t.dataset.p));
+if(t.dataset.c=='main')copy(mainTSV(w,t.dataset.p));
 if(t.dataset.c=='notes')copy(tsv(w,['notes']));
 if(t.dataset.c=='meas'){const m=S.wk[w]||{};copy([m.waist??'','',m.hips??'','',m.chest??''].join('\n'))}
 if(t.dataset.a=='exp'){dl(`coaching-backup-${iso(new Date())}.json`,bkJSON(),'application/json');stamp();toast('Backup saved')}
