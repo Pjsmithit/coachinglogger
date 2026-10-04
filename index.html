@@ -74,7 +74,7 @@ function weekRows(w){return Array.from({length:7},(_,i)=>{const dt=add(w,i);retu
 function tsv(w,cols,mode){return weekRows(w).map(([,d])=>{const o=[];for(const c of cols)o.push(String(d[c]??'').replace(/[\t\r\n]+/g,' '));return o.join('\t')}).join('\n')}
 const L2N=l=>[...l].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
 const colmap=Object.fromEntries(FL.filter(f=>f[3]!='AX').map(f=>[L2N(f[3]),f[0]]));
-const mainCols=[];for(let i=L2N('E');i<=L2N('AS');i++)mainCols.push(colmap[i]||'_');
+const mainCols=[];for(let i=L2N('E');i<=L2N('AF');i++)mainCols.push(colmap[i]||'_');
 const mainTSV=(w,p)=>weekRows(w).map(([,d])=>part(mainCols.map(c=>c=='_'?'':String(d[c]??'')),p).join('\t')).join('\n');
 async function sendDay(){const u=CFG.url||S.set.url;if(!u)return alert('Add your web app URL and token to the CFG line at the top of index.html first.');
 const d=S.days[cur]||{},fields={};for(const f of FL){const v=d[f[0]];if(v!==undefined&&v!=='')fields[f[0]]=v}
@@ -84,17 +84,12 @@ try{const r=await fetch(u,{method:'POST',body:JSON.stringify({token:CFG.tok||S.s
 const j=await r.json();if(j.ok)toast('Sent '+j.wrote+' cells to row '+j.row);else alert('Sheet said: '+j.error)}
 catch(e){alert('Could not confirm the send ('+e+'). Check the sheet in case it worked, then check the URL and that the web app is set to "Anyone".')}}
 const dayRow=()=>+S.set.row||13;
-function dayCells(dt){const d=S.days[dt]||{},i=pd(dt).getDay(),m=S.wk[sun(dt)]||{},r=dayRow();
-const au=[['WAIST',m.waist],['',''],['HIPS',m.hips],['',''],['CHEST',m.chest],['',''],['TOTAL',`=SUM(AV${r},AV${r+2},AV${r+4})`]][i];
-const cells=mainCols.map(c=>c=='_'?'':String(d[c]??''));
-cells.push('',au[0],au[1]??'','',String(d.notes??''));
-return cells.map(x=>x.replace(/[\t\r\n]+/g,' '))}
 const part=(c,p)=>p=='a'?c.slice(0,6):p=='k'?c.slice(6,7):p=='b'?c.slice(8):c;
-const dayTSV=(dt,p)=>part(dayCells(dt),p).join('\t');
+const dayTSV=(dt,p)=>{const d=S.days[dt]||{};return part(mainCols.map(c=>c=='_'?'':String(d[c]??'').replace(/[\t\r\n]+/g,' ')),p).join('\t')};
 function render(){
 $('#dt').value=cur;$('#dt').style.display=view=='day'?'':'none';$('#pv').style.display=$('#nx').style.display=view=='data'?'none':'';
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
-if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><button data-c=food>↻ Import metrics</button></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Google Sheet</h3><button data-c=send class=on>⬆ Send ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)} direct to sheet</button><small>Or copy and paste at <b>E${dayRow()+pd(cur).getDay()}</b> (${DN[pd(cur).getDay()]} row). Includes additional notes.</small><button data-c=day>Copy ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</button></div>`}
+if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b><button data-c=food>↻ Import metrics</button></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Google Sheet</h3><button data-c=send class=on>⬆ Send ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)} direct to sheet</button><small>Or copy and paste at <b>E${dayRow()+pd(cur).getDay()}</b> (${DN[pd(cur).getDay()]} row), columns E to AF. Notes are not copied.</small><button data-c=day>Copy ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</button></div>`}
 else if(view=='week')weekV();else dataV()}
 function weekV(){const w=sun(cur),r=weekRows(w),avg=k=>{const a=r.map(([,d])=>num(d[k])).filter(x=>x!==null);return a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(k=='weight'?1:0):'–'};
 const m=S.wk[w]||{},wa=avg('weight'),logged=r.filter(([,d])=>Object.keys(d).length).length;
@@ -104,9 +99,8 @@ app.innerHTML=`<div class=p><h3>Week ${w} → ${add(w,6)} <small>(${logged}/7 lo
 <small>Merged calorie cells need 3 pastes for the daily block (SUN row = ${dayRow()}):</small>
 <button data-c=main data-p=a>1a · Weight → Carbs · paste at E${dayRow()}</button>
 <button data-c=main data-p=k>1b · Calories · paste at K${dayRow()}</button>
-<button data-c=main data-p=b>1c · Fibre → Cycle cols · paste at M${dayRow()}</button>
-<button data-c=notes>2. Copy additional notes → paste at AX (SUN row)</button>
-<button data-c=meas>3. Copy measurements → paste at AV (waist row)</button>
+<button data-c=main data-p=b>1c · Fibre → Stool quality · paste at M${dayRow()}</button>
+<button data-c=meas>2. Copy measurements → paste at AV (waist row)</button>
 <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type=checkbox id=sent ${S.sent[w]?'checked':''} style="min-height:0"> Mark this week as transferred</label></div>`.replace('{row}','…')}
 function dataV(){const n=Object.keys(S.days).length,s=S.set;
 app.innerHTML=`${dayMsg()}<div class=p><h3>Backup & restore</h3><small>${n} days saved on this device. Last backup: ${S.bk?new Date(S.bk).toLocaleString('en-GB'):'never'}</small>
