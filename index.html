@@ -75,10 +75,16 @@ const L2N=l=>[...l].reduce((a,c)=>a*26+c.charCodeAt(0)-64,0);
 const colmap=Object.fromEntries(FL.filter(f=>f[3]!='AX').map(f=>[L2N(f[3]),f[0]]));
 const mainCols=[];for(let i=L2N('E');i<=L2N('AS');i++)mainCols.push(colmap[i]||'_');
 const mainTSV=w=>weekRows(w).map(([,d])=>mainCols.map(c=>c=='_'?'':String(d[c]??'')).join('\t')).join('\n');
+const dayRow=()=>+S.set.row||13;
+function dayTSV(dt){const d=S.days[dt]||{},i=pd(dt).getDay(),m=S.wk[sun(dt)]||{},r=dayRow();
+const au=[['WAIST',m.waist],['',''],['HIPS',m.hips],['',''],['CHEST',m.chest],['',''],['TOTAL',`=SUM(AV${r},AV${r+2},AV${r+4})`]][i];
+const cells=mainCols.map(c=>c=='_'?'':String(d[c]??''));
+cells.push('',au[0],au[1]??'','',String(d.notes??''));
+return cells.map(x=>x.replace(/[\t\r\n]+/g,' ')).join('\t')}
 function render(){
 $('#dt').value=cur;$('#dt').style.display=view=='day'?'':'none';$('#pv').style.display=$('#nx').style.display=view=='data'?'none':'';
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
-if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')}
+if(view=='day'){const d=S.days[cur]||{};app.innerHTML=dayMsg()+`<div class=p><b>${DN[pd(cur).getDay()]} ${pd(cur).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</b></div>`+SEC.map((s,i)=>`<details${i<3?' open':''}><summary>${s[0]}</summary><div class=g>${s[1].map(f=>fld(f,d)).join('')}</div></details>`).join('')+`<div class=p><h3>Copy this day to Google Sheet</h3><small>Paste at <b>E${dayRow()+pd(cur).getDay()}</b> (${DN[pd(cur).getDay()]} row). Includes additional notes.</small><button data-c=day>Copy ${DN[pd(cur).getDay()]} ${cur.slice(8)}/${cur.slice(5,7)}</button></div>`}
 else if(view=='week')weekV();else dataV()}
 function weekV(){const w=sun(cur),r=weekRows(w),avg=k=>{const a=r.map(([,d])=>num(d[k])).filter(x=>x!==null);return a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(k=='weight'?1:0):'–'};
 const m=S.wk[w]||{},wa=avg('weight'),logged=r.filter(([,d])=>Object.keys(d).length).length;
@@ -93,7 +99,7 @@ function dataV(){const n=Object.keys(S.days).length,s=S.set;
 app.innerHTML=`${dayMsg()}<div class=p><h3>Backup & restore</h3><small>${n} days saved on this device. Last backup: ${S.bk?new Date(S.bk).toLocaleString('en-GB'):'never'}</small>
 <button data-a=exp>⬇ Export backup (JSON)</button><button data-a=share>Share backup…</button><button data-a=csv>Export all days (CSV)</button>
 <button data-a=imp>⬆ Restore from backup file</button><input type=file id=fi accept=".json" hidden></div>
-<div class=p><h3>Targets & start</h3><div class=g style="padding:0">${[['sw','Start weight kg'],['p','Protein g'],['f','Fats g'],['c','Carbs g'],['steps','Steps'],['cardio','Cardio']].map(([k,l])=>`<div class=f><label>${l}</label><input data-s=${k} value="${esc(s[k])}"></div>`).join('')}</div></div>
+<div class=p><h3>Targets & start</h3><div class=g style="padding:0">${[['sw','Start weight kg'],['p','Protein g'],['f','Fats g'],['c','Carbs g'],['steps','Steps'],['cardio','Cardio'],['row','Sheet row of SUN (week block)']].map(([k,l])=>`<div class=f><label>${l}</label><input data-s=${k} value="${esc(s[k])}"></div>`).join('')}</div></div>
 <div class=p><small>Data lives in this browser only. Clearing site data or switching browser removes it, so export regularly.</small></div>`}
 const toast=m=>{const t=$('#t');t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,1800)};
 async function copy(x){try{await navigator.clipboard.writeText(x)}catch(e){const a=document.createElement('textarea');a.value=x;document.body.append(a);a.select();document.execCommand('copy');a.remove()}toast('Copied')}
@@ -109,6 +115,7 @@ if(['protein','fats','carbs'].includes(k)&&!d._km){const p=+d.protein||0,f=+d.fa
 if(k=='kcal')d._km=1;save()});
 app.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;const w=sun(cur);
 if(t.dataset.s&&t.dataset.k){const d=day(),k=t.dataset.k;if(d[k]==t.dataset.s)delete d[k];else d[k]=t.dataset.s;save();return render()}
+if(t.dataset.c=='day')copy(dayTSV(cur));
 if(t.dataset.c=='main')copy(mainTSV(w));
 if(t.dataset.c=='notes')copy(tsv(w,['notes']));
 if(t.dataset.c=='meas'){const m=S.wk[w]||{};copy([m.waist??'','',m.hips??'','',m.chest??''].join('\n'))}
